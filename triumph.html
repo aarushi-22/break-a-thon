@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeSwipe - Swipe to Connect</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Verdana', sans-serif;
+      background: #121212;
+      color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 10px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      padding: 20px;
+      text-align: center;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    h2 {
+      color: #0dbfdf;
+      margin-bottom: 20px;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 15px;
+      border-radius: 5px;
+      border: none;
+      outline: none;
+    }
+
+    input, textarea {
+      background: #252525;
+      color: #ffffff;
+    }
+
+    button {
+      background: #0dbfdf;
+      color: #ffffff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #09a3b6;
+    }
+
+    #swipe-profile, #matches {
+      margin-top: 20px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #matches li, #chat-matches li {
+      list-style: none;
+      margin: 10px 0;
+      padding: 15px;
+      background: #252525;
+      border-radius: 5px;
+    }
+
+    .swipe-controls {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+    }
+
+    .swipe-controls button {
+      flex: 1;
+      margin: 0 10px;
+    }
+
+    pre {
+      text-align: left;
+      background: #2d2d2d;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+
+    #chat-space {
+      margin-top: 20px;
+      background: #2d2d2d;
+      padding: 10px;
+      border-radius: 5px;
+      height: 300px;
+      overflow-y: auto;
+      text-align: left;
+    }
+
+    #chat-input {
+      display: flex;
+      margin-top: 10px;
+    }
+
+    #chat-input textarea {
+      flex: 1;
+      margin-right: 10px;
+    }
+
+    #chat-input button {
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container" id="signup-page">
+  <h2>Welcome to CodeSwipe: Swipe, Match, and Collaborate with Tech Enthusiasts!</h2>
+  <p>Sign Up</p>
+  <input type="text" id="username" placeholder="Enter your username">
+  <input type="password" id="password" placeholder="Enter your password">
+  <textarea id="techstack" placeholder="Describe your tech stack"></textarea>
+  <textarea id="code" placeholder="Enter your code snippet"></textarea>
+  <button onclick="signup()">Sign Up</button>
+  <p id="signup-error" style="color: red; display: none;">All fields are required!</p>
+</div>
+
+<div class="container hidden" id="profile-page">
+  <h2>Your Profile</h2>
+  <div id="user-profile"></div>
+  <button onclick="startSwiping()">Start Swiping</button>
+</div>
+
+<div class="container hidden" id="swipe-page">
+  <h2>Swipe to Connect</h2>
+  <div id="swipe-profile"></div>
+  <div class="swipe-controls">
+    <button onclick="swipe(false)">Skip</button>
+    <button onclick="swipe(true)">Connect</button>
+  </div>
+</div>
+
+<div class="container hidden" id="matched-list">
+  <h2>Your Matches</h2>
+  <ul id="matches"></ul>
+  <button onclick="showChat()">Go to Chat</button>
+</div>
+
+<div class="container hidden" id="chat-panel">
+  <h2>Chat</h2>
+  <ul id="chat-matches"></ul>
+  <div id="chat-space"></div>
+  <div id="chat-input">
+    <textarea id="chat-message" placeholder="Type your message..."></textarea>
+    <button onclick="sendMessage()">Send</button>
+  </div>
+  <button onclick="returnToHome()">Return to Home</button>
+</div>
+
+<script>
+  let user = null;
+  let profiles = [
+    { name: 'Alice', techstack: 'React, JavaScript', code: 'console.log("Hello, Alice!");' },
+    { name: 'Bob', techstack: 'Python, Django', code: 'print("Hello, Bob!")' }
+  ];
+  let matches = [];
+  let currentProfile = 0;
+
+  function signup() {
+    const username = document.getElementById('username').value.trim();
+    const techstack = document.getElementById('techstack').value.trim();
+    const code = document.getElementById('code').value.trim();
+
+    if (!username || !techstack || !code) {
+      document.getElementById('signup-error').style.display = 'block';
+      return;
+    }
+
+    user = { username, techstack, code };
+    document.getElementById('signup-page').classList.add('hidden');
+    document.getElementById('profile-page').classList.remove('hidden');
+
+    const profileHTML = `
+      <p><strong>Name:</strong> ${user.username}</p>
+      <p><strong>Tech Stack:</strong> ${user.techstack}</p>
+      <p><strong>Code Snippet:</strong></p>
+      <pre>${escapeHTML(user.code)}</pre>
+    `;
+    document.getElementById('user-profile').innerHTML = profileHTML;
+  }
+
+  function startSwiping() {
+    document.getElementById('profile-page').classList.add('hidden');
+    document.getElementById('swipe-page').classList.remove('hidden');
+    showProfile();
+  }
+
+  function showProfile() {
+    if (currentProfile >= profiles.length) {
+      document.getElementById('swipe-page').classList.add('hidden');
+      document.getElementById('matched-list').classList.remove('hidden');
+      updateMatches();
+      return;
+    }
+
+    const profile = profiles[currentProfile];
+    document.getElementById('swipe-profile').innerHTML = `
+      <p><strong>Name:</strong> ${profile.name}</p>
+      <p><strong>Tech Stack:</strong> ${profile.techstack}</p>
+      <p><strong>Code Snippet:</strong></p>
+      <pre>${escapeHTML(profile.code)}</pre>
+    `;
+  }
+
+  function swipe(like) {
+    if (like) matches.push(profiles[currentProfile]);
+    currentProfile++;
+    showProfile();
+  }
+
+  function updateMatches() {
+    const matchesList = document.getElementById('matches');
+    matchesList.innerHTML = matches.map(m => `<li>${m.name}</li>`).join('');
+  }
+
+  function showChat() {
+  document.getElementById('matched-list').classList.add('hidden');
+  document.getElementById('chat-panel').classList.remove('hidden');
+
+  const chatList = document.getElementById('chat-matches');
+  chatList.innerHTML = matches.map((m, index) => 
+    `<li><button onclick="selectMatch(${index})">Chat with ${m.name}</button></li>`
+  ).join('');
+}
+
+
+  function returnToHome() {
+    document.getElementById('chat-panel').classList.add('hidden');
+    document.getElementById('profile-page').classList.remove('hidden');
+  }
+
+  function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+  let currentChatMatch = null;
+
+function selectMatch(index) {
+  currentChatMatch = matches[index];
+  document.getElementById('chat-space').innerHTML = ''; // Clear previous chat
+  document.getElementById('chat-message').value = ''; // Clear input field
+  alert(`You are now chatting with ${currentChatMatch.name}`);
+}
+
+
+function sendMessage() {
+  if (!currentChatMatch) {
+    alert('Please select a match to start chatting!');
+    return;
+  }
+
+  const chatMessageInput = document.getElementById('chat-message');
+  const chatSpace = document.getElementById('chat-space');
+  const message = chatMessageInput.value.trim();
+
+  if (!message) return; // Prevent empty messages.
+
+  // Append user's message to chat space.
+  chatSpace.innerHTML += `<p><strong>You:</strong> ${escapeHTML(message)}</p>`;
+  chatMessageInput.value = ''; // Clear input field.
+  chatSpace.scrollTop = chatSpace.scrollHeight; // Scroll to bottom.
+
+  // Simulate a reply from the selected match.
+  setTimeout(() => {
+    chatSpace.innerHTML += `<p><strong>${currentChatMatch.name}:</strong> Thanks for the message! Let's discuss more.</p>`;
+    chatSpace.scrollTop = chatSpace.scrollHeight; // Scroll to bottom.
+  }, 1000);
+}
+
+
+</script>
+
+</body>
+</html>
